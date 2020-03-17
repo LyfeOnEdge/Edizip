@@ -79,7 +79,6 @@ class Edizip:
 			print(f"Creating virtual zip of {target}")
 			zip_bytes_object = zipit(target)
 			print(f"Making .edz at {outfile}...")
-			print("Reading zip archive.")
 			with open(outfile, "w+b") as out:
 				print("Writing header...")
 				out.write(header)
