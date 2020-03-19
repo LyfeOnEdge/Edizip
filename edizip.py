@@ -7,6 +7,7 @@ from io import BytesIO
 
 MAGIC = 0x4E5A4445 #EDZN
 u64_MAX = 0xFFFFFFFFFFFFFFFF
+HEADER_LENGTH = 37
 
 # Original zipit code:
 # http://stackoverflow.com/a/6078528
@@ -96,14 +97,92 @@ class Edizip:
 			except:
 				pass
 
+	def unzip(self, target: str, output_target: str = None):
+		"""Function to decompress edizip, returns a tuple containing the status and the header respsectively"""
+		"""An unsucessful decompression will result in a False status, and the header will be None"""
+		try:
+			target = os.path.abspath(target)
+			if output_target:
+				outdir = output_target
+			else:
+				outdir = os.path.dirname(target)
+
+			with open(target, "rb+") as archive:
+				header = archive.read(HEADER_LENGTH)
+				zip_contents = BytesIO(archive.read())
+
+			zip = zipfile.ZipFile(zip_contents, "r", zipfile.ZIP_DEFLATED)
+			zip.extractall(outdir)
+			status = True
+
+		except Exception as e:
+			print(f"Error decompressing archive {target} - {e}")
+			status = False
+			header = None
+
+		return (status, header)
+
+	def peek(self, target: str):
+		"""Returns tuple containing header and file list or None if unsucessful"""
+		try:
+			target = os.path.abspath(target)
+			if output_target:
+				outdir = output_target
+			else:
+				outdir = os.path.dirname(target)
+
+			with open(target, "rb+") as archive:
+				header = archive.read(HEADER_LENGTH)
+				zip_contents = BytesIO(archive.read())
+
+			zip = zipfile.ZipFile(zip_contents, "r", zipfile.ZIP_DEFLATED)
+			status = zip.namelist()
+			
+		except Exception as e:
+			print(f"Error decompressing archive {target} - {e}")
+			status = []
+			header = None
+
+		return (status, header)
+
+	def check_header(self, target: str):
+		"""Returns true if file header magic matches"""
+		with open(target, "rb+") as archive:
+			magic = archive.read(4)
+			if magic == struct.pack("I", self.magic):
+				return True
+			else:
+				return False
+
+
 if __name__ == "__main__":
 	import argparse
 	parser = argparse.ArgumentParser()
 	parser.add_argument("target", help = "Target dir to archive")
-	parser.add_argument("--output", help = "edizip output location, defaults to `target/target.edz` if not set")
+	parser.add_argument("-o", "--output", help = "Edizip output location, defaults to `target/target.edz` if not set")
+	parser.add_argument("-d", "--decompress", action='store_true', help = "Decompress file, target becomes archive and output becomes the target output directory. Will decompress in parent dir of archive if output dir not specified.")
+	parser.add_argument("-v", "--verify", action='store_true', help = "Verifies file magic is accurate, pass an integer representation of your magic to --magic if checking a file with non-standard magic")
+	parser.add_argument("-m", "--magic", help = "Magic to use in header, defaults to b'edzn'")
+	
 	args = parser.parse_args()
 
 	zipper = Edizip()
-	uid = zipper.generate_random_UID()
-	header = zipper.make_header("0", uid)
-	zipper.edizip(header, args.target, args.output)
+
+	if args.magic:
+		zipper.set_magic(int(args.magic))
+
+	if args.verify:
+		"""Check if valid magic"""
+		print("Checking magic...")
+		if zipper.check_header(args.target):
+			print("Valid magic.")
+		else:
+			print("Invalid magic.")
+	elif args.decompress:
+		"""Decompress archive"""
+		zipper.unzip(args.target, args.output)
+	else:
+		"""Compress archive"""
+		uid = zipper.generate_random_UID()
+		header = zipper.make_header("0", uid)
+		zipper.edizip(header, args.target, args.output)
