@@ -1,5 +1,5 @@
-# LyfeOnEdge March 17 2020
-# GPL3
+# LyfeOnEdge March 17 2020 GPL3
+# www.brewtools.dev (Lyfe's Discord and homebrew repository site)
 # Python3 module / script for generating .edz style archives.
 import os, sys, time, struct, zipfile, random
 from uuid import UUID
@@ -56,7 +56,8 @@ class Edizip:
 	def make_header(self, TID: int, UID: int, DELTA: bool = False):
 		"""returns an edz header in bytes object form"""
 		t = int(time.time()) #Get current time since epoch in decimal
-		print(f"Making header: Magic - {self.magic}, TID - {TID}, UID - {UID}, Delta - {DELTA}, Timestamp - {t}")
+		magic = struct.pack("<I", int(self.magic))
+		print(f"Making header: Magic - {magic}, TID - {TID}, UID - {UID}, Delta - {DELTA}, Timestamp - {t}")
 		packed_header = struct.pack("<IQQQQ?",
 			int(self.magic), #u32 - I
 			int(TID), #u64 - Q
@@ -68,7 +69,36 @@ class Edizip:
 		print(f"Header: {packed_header}")
 		return packed_header
 
-	def edizip(self, header, target: str, output_target: str = None):
+	def check_magic(self, target: str):
+		"""Returns true if file header magic matches"""
+		with open(target, "rb+") as archive:
+			magic = archive.read(4)
+			if magic == struct.pack("I", self.magic):
+				return True
+			else:
+				return False
+
+	def unpack_header(self, header):
+		magic, TID, UIDA, UIDB, t, DELTA = struct.unpack("<IQQQQ?",header)
+		mgc = struct.pack("<I", magic)
+		UID = hex((UIDA << 64) | UIDB)
+		print(f"Unpacked header: Magic - {mgc}, TID - {TID}, UID - {UID}, Delta - {DELTA}, Timestamp - {t}")
+		return (magic, TID, UID, t, DELTA)
+
+	def get_header(self, target: str):
+		"""Returns the target file's header, False if invalid magic, None on Error"""
+		try:
+			if not self.check_magic(target):
+				print("File magic invalid.")
+				return False
+			with open(target, "rb+") as archive:
+				header = archive.read(HEADER_LENGTH)
+				return self.unpack_header(header)
+		except Exception as e:
+			print(f"Failed to get header for {target} - {e}")
+			return None
+
+	def archive(self, header, target: str, output_target: str = None):
 		"""Function to make edizip, returns edz location if sucessful"""
 		try:
 			target = os.path.abspath(target)
@@ -97,22 +127,30 @@ class Edizip:
 			except:
 				pass
 
-	def unzip(self, target: str, output_target: str = None):
+	def unarchive(self, target: str, output_target: str = None):
 		"""Function to decompress edizip, returns a tuple containing the status and the header respsectively"""
 		"""An unsucessful decompression will result in a False status, and the header will be None"""
 		try:
 			target = os.path.abspath(target)
+			print(f"Decompressing archive {target}")
 			if output_target:
+				print(f"Using specified output dir {output_target}")
 				outdir = output_target
 			else:
 				outdir = os.path.dirname(target)
+				print(f"Decompressing archive in place at {outdir}")
 
+			print("Opening archive...")
 			with open(target, "rb+") as archive:
+				print(f"Reading header...")
 				header = archive.read(HEADER_LENGTH)
+				print(f"Reading archive contents...")
 				zip_contents = BytesIO(archive.read())
-
+			"Loading archive..."
 			zip = zipfile.ZipFile(zip_contents, "r", zipfile.ZIP_DEFLATED)
+			print("Extracting...")
 			zip.extractall(outdir)
+			print("Sucess!")
 			status = True
 
 		except Exception as e:
@@ -139,21 +177,11 @@ class Edizip:
 			status = zip.namelist()
 			
 		except Exception as e:
-			print(f"Error decompressing archive {target} - {e}")
+			print(f"Error peeking at archive {target} - {e}")
 			status = []
 			header = None
 
 		return (status, header)
-
-	def check_header(self, target: str):
-		"""Returns true if file header magic matches"""
-		with open(target, "rb+") as archive:
-			magic = archive.read(4)
-			if magic == struct.pack("I", self.magic):
-				return True
-			else:
-				return False
-
 
 if __name__ == "__main__":
 	import argparse
@@ -162,7 +190,8 @@ if __name__ == "__main__":
 	parser.add_argument("-o", "--output", help = "Edizip output location, defaults to `target/target.edz` if not set")
 	parser.add_argument("-d", "--decompress", action='store_true', help = "Decompress file, target becomes archive and output becomes the target output directory. Will decompress in parent dir of archive if output dir not specified.")
 	parser.add_argument("-v", "--verify", action='store_true', help = "Verifies file magic is accurate, pass an integer representation of your magic to --magic if checking a file with non-standard magic")
-	parser.add_argument("-m", "--magic", help = "Magic to use in header, defaults to b'edzn'")
+	parser.add_argument("-m", "--magic", help = "Magic to use when generating or checking headers, defaults to b'EDZN'")
+	parser.add_argument("-x", "--header", action='store_true', help = "Print file header, will fail if magic does not match.")
 	
 	args = parser.parse_args()
 
@@ -174,15 +203,17 @@ if __name__ == "__main__":
 	if args.verify:
 		"""Check if valid magic"""
 		print("Checking magic...")
-		if zipper.check_header(args.target):
+		if zipper.check_magic(args.target):
 			print("Valid magic.")
 		else:
 			print("Invalid magic.")
+	elif args.header:
+		zipper.get_header(args.target)
 	elif args.decompress:
 		"""Decompress archive"""
-		zipper.unzip(args.target, args.output)
+		zipper.unarchive(args.target, args.output)
 	else:
 		"""Compress archive"""
 		uid = zipper.generate_random_UID()
 		header = zipper.make_header("0", uid)
-		zipper.edizip(header, args.target, args.output)
+		zipper.archive(header, args.target, args.output)

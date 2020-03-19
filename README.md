@@ -2,7 +2,7 @@
 Python3 module / script for generating .edz style archives.
 
 ```
-usage: edizip.py [-h] [-o OUTPUT] [-d] [-c] [-m MAGIC] target
+usage: edizip.py [-h] [-o OUTPUT] [-d] [-v] [-m MAGIC] [-x,] target
 
 positional arguments:
   target                Target dir to archive
@@ -10,14 +10,16 @@ positional arguments:
 optional arguments:
   -h, --help            show this help message and exit
   -o OUTPUT, --output OUTPUT
-                        edizip output location, defaults to
+                        Edizip output location, defaults to
                         `target/target.edz` if not set
-  -d, --decompress      decompress file, target becomes archive and output
+  -d, --decompress      Decompress file, target becomes archive and output
                         becomes the target output directory. Will decompress
                         in parent dir of archive if output dir not specified.
-  -c, --check           Verifies file header is accurate, pass an integer
-                        representation of to --magic if checking for a file
-                        with non-standard magic
+  -v, --verify          Verifies file magic is accurate, pass an integer
+                        representation of your magic to --magic if checking a
+                        file with non-standard magic
   -m MAGIC, --magic MAGIC
-                        Magic to use in header.
+                        Magic to use when generating or checking headers,
+                        defaults to b'EDZN'
+  -x, --header          Print file header, will fail if magic does not match.
 ```
