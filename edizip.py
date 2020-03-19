@@ -1,4 +1,4 @@
-# LyfeOnEdge March 17 2020 GPL3
+# LyfeOnEdge March 17 2020 GPL2
 # www.brewtools.dev (Lyfe's Discord and homebrew repository site)
 # Python3 module / script for generating .edz style archives.
 import os, sys, time, struct, zipfile, random
