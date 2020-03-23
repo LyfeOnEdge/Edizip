@@ -42,10 +42,15 @@ class Edizip:
 	"""Object to handle zipping edizip files"""
 	def __init__(self, magic = MAGIC):
 		self.magic = magic
+		self.tid = 0
 
 	def set_magic(self, magic: int):
 		"""Change magic"""
 		self.magic = magic
+
+	def set_tid(self, tid: int):
+		"""Set tid"""
+		self.tid = int(int)
 
 	def generate_random_UID(self):
 		"""Generate a random UID for the header"""
@@ -53,8 +58,10 @@ class Edizip:
 		print(f"Generated random UID {UID}")
 		return UUID(int=UID)
 
-	def make_header(self, TID: int, UID: int, DELTA: bool = False):
+	def make_header(self, TID, UID: int, DELTA: bool = False):
 		"""returns an edz header in bytes object form"""
+		if not TID: #If not passed, use default
+			TID = self.tid
 		t = int(time.time()) #Get current time since epoch in decimal
 		magic = struct.pack("<I", int(self.magic))
 		print(f"Making header: Magic - {magic}, TID - {TID}, UID - {UID}, Delta - {DELTA}, Timestamp - {t}")
@@ -105,7 +112,13 @@ class Edizip:
 			if output_target:
 				outfile = output_target
 			else:
-				outfile = os.path.join(target, os.path.basename(target) + ".edz")
+				if os.path.isfile(target):
+					outfile = target + ".edz"
+				elif os.path.isdir(target):
+					outfile = os.path.join(target, os.path.basename(target) + ".edz")
+				else:
+					print("No valid output target")
+					return
 			#Zip target dir
 			print(f"Creating virtual zip of {target}")
 			zip_bytes_object = zipit(target)
@@ -188,6 +201,7 @@ if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
 	parser.add_argument("target", help = "Target dir to archive")
 	parser.add_argument("-o", "--output", help = "Edizip output location, defaults to `target/target.edz` if not set")
+	parser.add_argument("-t", "--title", help = "TitleID, defaults to 0")
 	parser.add_argument("-d", "--decompress", action='store_true', help = "Decompress file, target becomes archive and output becomes the target output directory. Will decompress in parent dir of archive if output dir not specified.")
 	parser.add_argument("-v", "--verify", action='store_true', help = "Verifies file magic is accurate, pass an integer representation of your magic to --magic if checking a file with non-standard magic")
 	parser.add_argument("-m", "--magic", help = "Magic to use when generating or checking headers, defaults to b'EDZN'")
@@ -196,6 +210,9 @@ if __name__ == "__main__":
 	args = parser.parse_args()
 
 	zipper = Edizip()
+
+	if args.title:
+		zipper.set_tid(int(args.title))
 
 	if args.magic:
 		zipper.set_magic(int(args.magic))
@@ -215,5 +232,5 @@ if __name__ == "__main__":
 	else:
 		"""Compress archive"""
 		uid = zipper.generate_random_UID()
-		header = zipper.make_header("0", uid)
+		header = zipper.make_header(None, uid)
 		zipper.archive(header, args.target, args.output)
